@@ -1,1 +1,275 @@
 <h1>Github pages </h1>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Herramienta Educativa de Fasores</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            gap: 20px;
+        }
+        .main-container {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+        .graphics-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+        canvas {
+            border: 2px solid #333;
+            background-color: #fff;
+        }
+        #controls-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 320px;
+        }
+        .control-panel {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .control-group { margin-bottom: 15px; }
+        label { font-weight: 600; display: block; margin-bottom: 5px; }
+        input[type="range"] { width: 100%; }
+        #operations { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        #operations button {
+            padding: 10px;
+            font-size: 1.2em;
+            background-color: #5a67d8;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #operations button:hover { background-color: #434190; }
+        #info-box {
+            background-color: #e9ecef;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.95em;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            border-radius: 5px;
+        }
+        h1, h3 { margin: 0 0 15px 0; }
+        hr { border: none; border-top: 1px solid #ccc; margin: 15px 0; }
+        .canvas-title { font-weight: bold; font-size: 1.1em; margin-bottom: 5px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <h1>Herramienta Educativa de Fasores</h1>
+    <div class="main-container">
+        <div class="graphics-container">
+            <div class="canvas-title">Plano Complejo (Dominio Fasorial)</div>
+            <canvas id="complex-plane" width="500" height="500"></canvas>
+            <div class="canvas-title">Dominio del Tiempo (Ondas Senoidales)</div>
+            <canvas id="time-domain" width="500" height="200"></canvas>
+        </div>
+        <div id="controls-container">
+            <div class="control-panel">
+                <h3>Fasor 1 (Azul)</h3>
+                <div class="control-group">
+                    <label for="magnitude-slider-1">Magnitud (A₁): <span id="magnitude-value-1">10</span></label>
+                    <input type="range" id="magnitude-slider-1" min="0" max="10" value="10" step="1">
+                </div>
+                <div class="control-group">
+                    <label for="angle-slider-1">Ángulo (θ₁): <span id="angle-value-1">45</span>°</label>
+                    <input type="range" id="angle-slider-1" min="0" max="360" value="45" step="1">
+                </div>
+            </div>
+             <div class="control-panel">
+                <h3>Fasor 2 (Rojo)</h3>
+                <div class="control-group">
+                    <label for="magnitude-slider-2">Magnitud (A₂): <span id="magnitude-value-2">5</span></label>
+                    <input type="range" id="magnitude-slider-2" min="0" max="10" value="5" step="1">
+                </div>
+                <div class="control-group">
+                    <label for="angle-slider-2">Ángulo (θ₂): <span id="angle-value-2">120</span>°</label>
+                    <input type="range" id="angle-slider-2" min="0" max="360" value="120" step="1">
+                </div>
+            </div>
+            <div class="control-panel">
+                <h3>Operaciones</h3>
+                <div id="operations">
+                    <button id="op-add">+</button>
+                    <button id="op-subtract">−</button>
+                    <button id="op-multiply">×</button>
+                    <button id="op-divide">÷</button>
+                </div>
+                <hr>
+                <div id="info-box">Selecciona una operación</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class Phasor {
+            constructor(A, angleDeg) {
+                this.A = parseFloat(A);
+                this.angleRad = parseFloat(angleDeg) * Math.PI / 180;
+            }
+            get angleDeg() { return this.angleRad * 180 / Math.PI; }
+            get x() { return this.A * Math.cos(this.angleRad); }
+            get y() { return this.A * Math.sin(this.angleRad); }
+            static fromRect(x, y) {
+                const A = Math.sqrt(x*x + y*y);
+                const angleRad = Math.atan2(y, x);
+                return new Phasor(A, angleRad * 180 / Math.PI);
+            }
+            static add(p1, p2) { return Phasor.fromRect(p1.x + p2.x, p1.y + p2.y); }
+            static subtract(p1, p2) { return Phasor.fromRect(p1.x - p2.x, p1.y - p2.y); }
+            static multiply(p1, p2) { return new Phasor(p1.A * p2.A, (p1.angleRad + p2.angleRad) * 180 / Math.PI); }
+            static divide(p1, p2) {
+                if (p2.A === 0) return new Phasor(0, 0);
+                return new Phasor(p1.A / p2.A, (p1.angleRad - p2.angleRad) * 180 / Math.PI);
+            }
+        }
+
+        const complexCanvas = document.getElementById('complex-plane');
+        const timeCanvas = document.getElementById('time-domain');
+        const ctxC = complexCanvas.getContext('2d');
+        const ctxT = timeCanvas.getContext('2d');
+        const controls = {
+            m1: { s: document.getElementById('magnitude-slider-1'), v: document.getElementById('magnitude-value-1') },
+            a1: { s: document.getElementById('angle-slider-1'), v: document.getElementById('angle-value-1') },
+            m2: { s: document.getElementById('magnitude-slider-2'), v: document.getElementById('magnitude-value-2') },
+            a2: { s: document.getElementById('angle-slider-2'), v: document.getElementById('angle-value-2') },
+        };
+        const infoBoxEl = document.getElementById('info-box');
+        
+        const cWidth = complexCanvas.width, cHeight = complexCanvas.height;
+        const cCenterX = cWidth / 2, cCenterY = cHeight / 2;
+        const scale = 20;
+        let resultPhasor = null, operation = { symbol: '', p1: null, p2: null };
+
+        function drawComplexGrid() {
+            ctxC.clearRect(0, 0, cWidth, cHeight);
+            ctxC.strokeStyle = '#ddd'; ctxC.lineWidth = 1;
+            for (let i = scale; i < cWidth/2; i+=scale) {
+                ctxC.beginPath(); ctxC.moveTo(cCenterX + i, 0); ctxC.lineTo(cCenterX + i, cHeight); ctxC.moveTo(cCenterX - i, 0); ctxC.lineTo(cCenterX - i, cHeight);
+                ctxC.moveTo(0, cCenterY + i); ctxC.lineTo(cWidth, cCenterY + i); ctxC.moveTo(0, cCenterY - i); ctxC.lineTo(cWidth, cCenterY - i); ctxC.stroke();
+            }
+            ctxC.strokeStyle = '#333'; ctxC.lineWidth = 2;
+            ctxC.beginPath(); ctxC.moveTo(0, cCenterY); ctxC.lineTo(cWidth, cCenterY); ctxC.stroke();
+            ctxC.moveTo(cCenterX, 0); ctxC.lineTo(cCenterX, cHeight); ctxC.stroke();
+            ctxC.font = '14px Arial'; ctxC.fillStyle = '#333'; ctxC.fillText('Re', cWidth - 25, cCenterY - 10); ctxC.fillText('Im', cCenterX + 10, 15);
+        }
+
+        function drawPhasor(phasor, color, origin = {x: 0, y: 0}, isGhost = false) {
+            if (!phasor || phasor.A === 0) return;
+            const startX = cCenterX + origin.x * scale, startY = cCenterY - origin.y * scale;
+            const endX = cCenterX + (origin.x + phasor.x) * scale, endY = cCenterY - (origin.y + phasor.y) * scale;
+            ctxC.strokeStyle = color; ctxC.fillStyle = color;
+            ctxC.lineWidth = isGhost ? 2 : 3; ctxC.setLineDash(isGhost ? [5, 5] : []);
+            ctxC.beginPath(); ctxC.moveTo(startX, startY); ctxC.lineTo(endX, endY); ctxC.stroke();
+            if (!isGhost) {
+                const headlen = 10, angle = Math.atan2(endY - startY, endX - startX);
+                ctxC.beginPath(); ctxC.moveTo(endX, endY);
+                ctxC.lineTo(endX - headlen * Math.cos(angle - Math.PI / 6), endY - headlen * Math.sin(angle - Math.PI / 6));
+                ctxC.lineTo(endX - headlen * Math.cos(angle + Math.PI / 6), endY - headlen * Math.sin(angle + Math.PI / 6));
+                ctxC.closePath(); ctxC.fill();
+            }
+            ctxC.setLineDash([]);
+        }
+
+        function drawTimeDomain(phasors) {
+            const tWidth = timeCanvas.width, tHeight = timeCanvas.height;
+            const tCenterY = tHeight / 2;
+            ctxT.clearRect(0, 0, tWidth, tHeight);
+            ctxT.strokeStyle = '#ccc'; ctxT.lineWidth = 1;
+            ctxT.beginPath(); ctxT.moveTo(0, tCenterY); ctxT.lineTo(tWidth, tCenterY); ctxT.stroke();
+            
+            phasors.forEach(({phasor, color}) => {
+                if (!phasor) return;
+                ctxT.strokeStyle = color; ctxT.lineWidth = 2;
+                ctxT.beginPath();
+                for (let px = 0; px < tWidth; px++) {
+                    const t = (px / tWidth) * 2 * Math.PI; // Simula un ciclo de tiempo
+                    const omega_t = t * 2; // Frecuencia angular de 2 para ver dos ciclos
+                    const y = phasor.A * Math.cos(omega_t + phasor.angleRad);
+                    const canvasY = tCenterY - y * (scale / 2); // Escala vertical
+                    if (px === 0) ctxT.moveTo(px, canvasY);
+                    else ctxT.lineTo(px, canvasY);
+                }
+                ctxT.stroke();
+            });
+        }
+
+        function updateDisplay() {
+            controls.m1.v.textContent = controls.m1.s.value;
+            controls.a1.v.textContent = controls.a1.s.value;
+            controls.m2.v.textContent = controls.m2.s.value;
+            controls.a2.v.textContent = controls.a2.s.value;
+            
+            const p1 = new Phasor(controls.m1.s.value, controls.a1.s.value);
+            const p2 = new Phasor(controls.m2.s.value, controls.a2.s.value);
+            
+            drawComplexGrid();
+            drawPhasor(p1, '#007bff');
+            drawPhasor(p2, '#dc3545');
+
+            if (operation.symbol === '+') drawPhasor(p2, 'rgba(220, 53, 69, 0.5)', p1, true);
+            if (operation.symbol === '-') drawPhasor(new Phasor(p2.A, p2.angleDeg + 180), 'rgba(220, 53, 69, 0.5)', p1, true);
+
+            if (resultPhasor) drawPhasor(resultPhasor, '#28a745');
+            
+            drawTimeDomain([ {phasor: p1, color: '#007bff'}, {phasor: p2, color: '#dc3545'}, {phasor: resultPhasor, color: '#28a745'} ]);
+            updateInfoBox(p1, p2);
+        }
+
+        function updateInfoBox(p1, p2) {
+            let info = `<strong>F1:</strong> ${p1.A.toFixed(0)} ∠ ${p1.angleDeg.toFixed(0)}°\n`;
+            info += `<strong>F2:</strong> ${p2.A.toFixed(0)} ∠ ${p2.angleDeg.toFixed(0)}°\n`;
+            if (resultPhasor) {
+                info += `<hr><strong>Resultado (F1 ${operation.symbol} F2):</strong>\n`;
+                info += `  ${resultPhasor.A.toFixed(2)} ∠ ${resultPhasor.angleDeg.toFixed(2)}°\n`;
+                info += `  ${resultPhasor.x.toFixed(2)} + j(${resultPhasor.y.toFixed(2)})`;
+            } else {
+                 info += `<hr>Selecciona una operación`;
+            }
+            infoBoxEl.innerHTML = info;
+        }
+
+        function handleOperation(op) {
+            const p1 = new Phasor(controls.m1.s.value, controls.a1.s.value);
+            const p2 = new Phasor(controls.m2.s.value, controls.a2.s.value);
+            operation.symbol = op;
+            switch(op) {
+                case '+': resultPhasor = Phasor.add(p1, p2); break;
+                case '-': resultPhasor = Phasor.subtract(p1, p2); break;
+                case '×': resultPhasor = Phasor.multiply(p1, p2); break;
+                case '÷': resultPhasor = Phasor.divide(p1, p2); break;
+            }
+            updateDisplay();
+        }
+        
+        document.getElementById('op-add').addEventListener('click', () => handleOperation('+'));
+        document.getElementById('op-subtract').addEventListener('click', () => handleOperation('-'));
+        document.getElementById('op-multiply').addEventListener('click', () => handleOperation('×'));
+        document.getElementById('op-divide').addEventListener('click', () => handleOperation('÷'));
+        
+        Object.values(controls).forEach(c => c.s.addEventListener('input', () => {
+            resultPhasor = null; operation.symbol = ''; updateDisplay();
+        }));
+
+        updateDisplay();
+    </script>
+</body>
+</html>
