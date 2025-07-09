@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tres en Raya vs Ordenador (Difícil)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Estilos personalizados para el juego */
+        body {
+            font-family: 'Poppins', sans-serif;
+            touch-action: manipulation; /* Mejora la respuesta táctil en móviles */
+        }
+        .board-cell {
+            /* Estilo para las celdas del tablero */
+            width: 100px;
+            height: 100px;
+            font-size: 3.5rem; /* Tamaño de la X y O */
+            line-height: 1;
+            font-weight: 700;
+            transition: all 0.2s ease-in-out;
+            border: 2px solid #374151; /* Borde gris oscuro */
+        }
+        .board-cell:hover {
+            background-color: #e5e7eb; /* Color de fondo al pasar el ratón */
+        }
+        /* Estilos para que el tablero se vea bien */
+        .grid > .board-cell:nth-child(-n+3) { border-top: none; }
+        .grid > .board-cell:nth-child(n+7) { border-bottom: none; }
+        .grid > .board-cell:nth-child(3n+1) { border-left: none; }
+        .grid > .board-cell:nth-child(3n) { border-right: none; }
+
+        .player-x { color: #3b82f6; } /* Color azul para el jugador */
+        .player-o { color: #ef4444; } /* Color rojo para el ordenador */
+
+        /* Animación para el mensaje de estado */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .status-message {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="text-center mb-8">
+        <h1 class="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white">Tres en Raya</h1>
+        <p class="text-lg text-gray-600 dark:text-gray-300">Juega contra el ordenador (IA Mejorada)</p>
+    </div>
+
+    <div id="game-container" class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl">
+        <div id="board" class="grid grid-cols-3 gap-2 mb-6">
+            </div>
+
+        <div class="text-center">
+            <p id="status" class="text-xl font-semibold mb-4 h-8 status-message">¡Tu turno!</p>
+            <button id="reset-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-300">
+                Reiniciar Partida
+            </button>
+        </div>
+    </div>
+
+    <footer class="mt-8 text-center text-gray-500 dark:text-gray-400 text-sm">
+        <p>Proyecto educativo creado con fines de aprendizaje.</p>
+    </footer>
+
+    <script>
+        // --- VARIABLES Y CONSTANTES DEL JUEGO ---
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
+        const resetButton = document.getElementById('reset-button');
+
+        const PLAYER_X = 'X'; // Jugador humano
+        const PLAYER_O = 'O'; // Ordenador
+        let currentPlayer;
+        let boardState;
+        let gameActive;
+
+        // Combinaciones ganadoras (índices de las celdas)
+        const winningCombinations = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // Filas
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columnas
+            [0, 4, 8], [2, 4, 6]             // Diagonales
+        ];
+
+        // --- FUNCIONES PRINCIPALES DEL JUEGO ---
+
+        /**
+         * Inicia o reinicia el juego a su estado inicial.
+         */
+        function startGame() {
+            currentPlayer = PLAYER_X;
+            boardState = Array(9).fill(null);
+            gameActive = true;
+
+            boardElement.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('button');
+                cell.classList.add('board-cell', 'flex', 'items-center', 'justify-center', 'rounded-lg');
+                cell.dataset.index = i;
+                cell.addEventListener('click', handleCellClick);
+                boardElement.appendChild(cell);
+            }
+
+            updateStatus(`¡Tu turno!`);
+        }
+
+        /**
+         * Se ejecuta cuando un jugador hace clic en una celda.
+         * @param {Event} event - El evento de clic.
+         */
+        function handleCellClick(event) {
+            if (!gameActive) return;
+
+            const clickedCell = event.target;
+            const cellIndex = parseInt(clickedCell.dataset.index);
+
+            if (boardState[cellIndex] !== null || currentPlayer !== PLAYER_X) {
+                return;
+            }
+
+            makeMove(cellIndex, PLAYER_X);
+
+            if (!checkGameOver()) {
+                // Si el juego no ha terminado, es el turno del ordenador
+                updateStatus('Pensando...');
+                setTimeout(computerMove, 600); // Pausa para simular que "piensa"
+            }
+        }
+
+        /**
+         * Elige el mejor movimiento para el ordenador basándose en una jerarquía de reglas.
+         */
+        function computerMove() {
+            if (!gameActive) return;
+
+            // 1. Intentar ganar
+            let move = findWinningOrBlockingMove(PLAYER_O);
+            if (move !== null) {
+                makeMove(move, PLAYER_O);
+                checkGameOver();
+                return;
+            }
+
+            // 2. Bloquear al jugador
+            move = findWinningOrBlockingMove(PLAYER_X);
+            if (move !== null) {
+                makeMove(move, PLAYER_O);
+                checkGameOver();
+                return;
+            }
+
+            // 3. Tomar el centro si está libre
+            if (boardState[4] === null) {
+                makeMove(4, PLAYER_O);
+                checkGameOver();
+                return;
+            }
+            
+            // 4. Tomar una esquina vacía
+            const corners = [0, 2, 6, 8];
+            const emptyCorners = corners.filter(index => boardState[index] === null);
+            if (emptyCorners.length > 0) {
+                const randomCorner = emptyCorners[Math.floor(Math.random() * emptyCorners.length)];
+                makeMove(randomCorner, PLAYER_O);
+                checkGameOver();
+                return;
+            }
+
+            // 5. Tomar una casilla lateral vacía
+            const sides = [1, 3, 5, 7];
+            const emptySides = sides.filter(index => boardState[index] === null);
+            if (emptySides.length > 0) {
+                const randomSide = emptySides[Math.floor(Math.random() * emptySides.length)];
+                makeMove(randomSide, PLAYER_O);
+                checkGameOver();
+                return;
+            }
+        }
+
+        /**
+         * Busca un movimiento para ganar o para bloquear al oponente.
+         * @param {string} player - El jugador para el cual buscar el movimiento ('X' o 'O').
+         * @returns {number|null} - El índice de la celda para ganar/bloquear, o null si no hay ninguno.
+         */
+        function findWinningOrBlockingMove(player) {
+            for (const combination of winningCombinations) {
+                const [a, b, c] = combination;
+                const line = [boardState[a], boardState[b], boardState[c]];
+
+                // Si hay dos casillas del jugador y una vacía en la línea
+                if (line.filter(p => p === player).length === 2 && line.includes(null)) {
+                    // Devolvemos el índice de la casilla vacía
+                    if (boardState[a] === null) return a;
+                    if (boardState[b] === null) return b;
+                    if (boardState[c] === null) return c;
+                }
+            }
+            return null; // No se encontró movimiento
+        }
+
+
+        /**
+         * Actualiza el estado del juego y la interfaz para un movimiento.
+         * @param {number} index - El índice de la celda.
+         * @param {string} player - El jugador que hace el movimiento ('X' o 'O').
+         */
+        function makeMove(index, player) {
+            if (boardState[index] !== null || !gameActive) return;
+
+            boardState[index] = player;
+            const cell = boardElement.children[index];
+            cell.textContent = player;
+            cell.classList.add(player === PLAYER_X ? 'player-x' : 'player-o');
+            cell.disabled = true;
+
+            // Cambiar el jugador actual
+            currentPlayer = (player === PLAYER_X) ? PLAYER_O : PLAYER_X;
+        }
+
+        /**
+         * Comprueba si hay un ganador o si es un empate.
+         * @returns {boolean} - Devuelve true si el juego ha terminado.
+         */
+        function checkGameOver() {
+            let roundWon = false;
+            let winner = null;
+
+            for (const combination of winningCombinations) {
+                const [a, b, c] = combination;
+                if (boardState[a] && boardState[a] === boardState[b] && boardState[a] === boardState[c]) {
+                    roundWon = true;
+                    winner = boardState[a];
+                    break;
+                }
+            }
+
+            if (roundWon) {
+                updateStatus(`¡Ha ganado ${winner}!`);
+                gameActive = false;
+                return true;
+            }
+
+            if (!boardState.includes(null)) {
+                updateStatus('¡Es un empate!');
+                gameActive = false;
+                return true;
+            }
+            
+            // Si el juego continúa, actualiza el turno
+            if (gameActive) {
+               updateStatus(currentPlayer === PLAYER_X ? '¡Tu turno!' : 'Turno del ordenador');
+            }
+
+            return false;
+        }
+
+        /**
+         * Actualiza el mensaje de estado del juego.
+         * @param {string} message - El mensaje a mostrar.
+         */
+        function updateStatus(message) {
+            statusElement.textContent = message;
+            statusElement.classList.remove('status-message');
+            void statusElement.offsetWidth;
+            statusElement.classList.add('status-message');
+        }
+
+        // --- INICIALIZACIÓN ---
+        resetButton.addEventListener('click', startGame);
+        startGame();
+
+    </script>
+</body>
+</html>
