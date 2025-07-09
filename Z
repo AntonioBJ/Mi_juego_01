@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Visualizador de Funciones Complejas</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.2/math.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+        #controls {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        label {
+            font-weight: 500;
+        }
+        select, input, button {
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #status {
+            margin-top: 10px;
+            color: #555;
+            font-style: italic;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            background-color: black;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Visualizador de Funciones Complejas</h1>
+    <div id="controls">
+        <label for="function-select">Elige una función:</label>
+        <select id="function-select">
+            <option value="exp(z)">f(z) = e^z</option>
+            <option value="z^2">f(z) = z²</option>
+            <option value="z^3">f(z) = z³</option>
+            <option value="1/z">f(z) = 1/z</option>
+            <option value="sin(z)">f(z) = sin(z)</option>
+            <option value="log(z)">f(z) = log(z)</option>
+            <option value="gamma(z)">f(z) = Γ(z) (Gamma)</option>
+            <option value="(z^2 - 1) * (z - 2 - i)^2 / (z^2 + 2 + 2i)">f(z) = Polinomio</option>
+            <option value="custom">Personalizada...</option>
+        </select>
+        <input type="text" id="custom-function-input" style="display:none;" placeholder="Ej: z^2 + z">
+        <button id="render-button">Visualizar</button>
+    </div>
+    
+    <canvas id="complex-canvas" width="600" height="600"></canvas>
+    <p id="status"></p>
+
+    <script>
+        // --- 1. REFERENCIAS A ELEMENTOS DEL DOM ---
+        const canvas = document.getElementById('complex-canvas');
+        const ctx = canvas.getContext('2d');
+        const select = document.getElementById('function-select');
+        const customInput = document.getElementById('custom-function-input');
+        const renderBtn = document.getElementById('render-button');
+        const statusEl = document.getElementById('status');
+
+        // --- 2. LÓGICA DE RENDERIZADO ---
+
+        /**
+         * Renderiza la visualización de una función compleja en el canvas.
+         */
+        async function render() {
+            statusEl.textContent = 'Renderizando...';
+            // Usamos un timeout para que el mensaje "Renderizando" aparezca en la UI
+            // antes de que el bucle principal bloquee el hilo.
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            const width = canvas.width;
+            const height = canvas.height;
+            const imageData = ctx.createImageData(width, height);
+            
+            // Define los límites del plano complejo a visualizar
+            const x_min = -Math.PI, x_max = Math.PI;
+            const y_min = -Math.PI, y_max = Math.PI;
+
+            // Obtiene la función del input o del select
+            let functionString = select.value === 'custom' ? customInput.value : select.value;
+            if (!functionString) {
+                statusEl.textContent = 'Error: La función no puede estar vacía.';
+                return;
+            }
+
+            try {
+                // Compila la función una sola vez para mayor eficiencia
+                const node = math.parse(functionString);
+                const code = node.compile();
+
+                // Bucle principal: recorre cada píxel del canvas
+                for (let px = 0; px < width; px++) {
+                    for (let py = 0; py < height; py++) {
+                        // Mapea el píxel (px, py) a un número complejo z
+                        const zx = x_min + (px / width) * (x_max - x_min);
+                        const zy = y_max - (py / height) * (y_max - y_min); // 'y' invertida
+                        const z = math.complex(zx, zy);
+
+                        // Aplica la función a z para obtener w
+                        const w = code.evaluate({ z: z });
+
+                        // Calcula el color (HSV) a partir del resultado w
+                        const polar = w.toPolar();
+                        const hue = (polar.phi + Math.PI) / (2 * Math.PI);
+                        const saturation = 0.9;
+                        const value = 1 - Math.exp(-polar.r * 0.4);
+
+                        const [r, g, b] = hsvToRgb(hue, saturation, value);
+                        
+                        // Asigna el color al píxel en el buffer de imagen
+                        const index = (py * width + px) * 4;
+                        imageData.data[index] = r;
+                        imageData.data[index + 1] = g;
+                        imageData.data[index + 2] = b;
+                        imageData.data[index + 3] = 255; // Alpha (opacidad)
+                    }
+                }
+                
+                // Dibuja la imagen completa en el canvas de una sola vez
+                ctx.putImageData(imageData, 0, 0);
+                statusEl.textContent = `Visualizando f(z) = ${functionString}`;
+            } catch (error) {
+                statusEl.textContent = `Error en la función: ${error.message}`;
+            }
+        }
+        
+        /**
+         * Convierte un color de formato HSV a RGB.
+         * h, s, v están en el rango [0, 1] y devuelve r, g, b en [0, 255].
+         */
+        function hsvToRgb(h, s, v) {
+            let r, g, b;
+            let i = Math.floor(h * 6);
+            let f = h * 6 - i;
+            let p = v * (1 - s);
+            let q = v * (1 - f * s);
+            let t = v * (1 - (1 - f) * s);
+            switch (i % 6) {
+                case 0: r = v, g = t, b = p; break;
+                case 1: r = q, g = v, b = p; break;
+                case 2: r = p, g = v, b = t; break;
+                case 3: r = p, g = q, b = v; break;
+                case 4: r = t, g = p, b = v; break;
+                case 5: r = v, g = p, b = q; break;
+            }
+            return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+        }
+
+        // --- 3. EVENTOS DE USUARIO ---
+        renderBtn.addEventListener('click', render);
+        select.addEventListener('change', () => {
+            customInput.style.display = select.value === 'custom' ? 'block' : 'none';
+        });
+
+        // Renderiza la función por defecto al cargar la página
+        render();
+
+    </script>
+</body>
+</html>
