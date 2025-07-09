@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cuatro en Raya con Gravedad</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            touch-action: manipulation;
+        }
+        .board-cell {
+            width: 60px;
+            height: 60px;
+            font-size: 2.5rem;
+            line-height: 1;
+            font-weight: 700;
+            transition: all 0.1s ease-in-out;
+            border: 2px solid #4b5563; /* Borde más visible */
+            background-color: #374151; /* Fondo oscuro para las celdas */
+            cursor: pointer;
+        }
+        @media (max-width: 480px) {
+            .board-cell {
+                width: 50px;
+                height: 50px;
+                font-size: 2rem;
+            }
+        }
+        
+        /* Estilo para la columna cuando el ratón está encima */
+        .column-hover {
+            background-color: #4b5563;
+        }
+        
+        /* Estilo para la ficha "fantasma" que muestra dónde caerá la pieza */
+        .drop-preview::after {
+            content: 'X'; /* Muestra una X como vista previa */
+            color: rgba(59, 130, 246, 0.3); /* Color azul semitransparente */
+            animation: fadeIn 0.2s;
+        }
+
+        .player-x { color: #3b82f6; }
+        .player-o { color: #ef4444; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .status-message {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="text-center mb-8">
+        <h1 class="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white">Cuatro en Raya</h1>
+        <p class="text-lg text-gray-600 dark:text-gray-300">¡Las fichas caen con gravedad!</p>
+    </div>
+
+    <div id="game-container" class="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-2xl shadow-2xl">
+        <div id="board" class="mb-6">
+            </div>
+
+        <div class="text-center">
+            <p id="status" class="text-xl font-semibold mb-4 h-8 status-message">¡Tu turno!</p>
+            <button id="reset-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-300">
+                Reiniciar Partida
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURACIÓN Y CONSTANTES ---
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
+        const resetButton = document.getElementById('reset-button');
+
+        const PLAYER_X = 'X';
+        const PLAYER_O = 'O';
+        const BOARD_SIZE = 6;
+        const WIN_LENGTH = 4;
+        const TOTAL_CELLS = BOARD_SIZE * BOARD_SIZE;
+
+        let currentPlayer, boardState, gameActive;
+
+        function generateWinningCombinations(size, length) {
+            const combinations = [];
+            for (let r = 0; r < size; r++) { for (let c = 0; c <= size - length; c++) { const co = []; for (let i = 0; i < length; i++) co.push(r * size + c + i); combinations.push(co); }}
+            for (let c = 0; c < size; c++) { for (let r = 0; r <= size - length; r++) { const co = []; for (let i = 0; i < length; i++) co.push((r + i) * size + c); combinations.push(co); }}
+            for (let r = 0; r <= size - length; r++) { for (let c = 0; c <= size - length; c++) { const co = []; for (let i = 0; i < length; i++) co.push((r + i) * size + (c + i)); combinations.push(co); }}
+            for (let r = 0; r <= size - length; r++) { for (let c = length - 1; c < size; c++) { const co = []; for (let i = 0; i < length; i++) co.push((r + i) * size + (c - i)); combinations.push(co); }}
+            return combinations;
+        }
+        const winningCombinations = generateWinningCombinations(BOARD_SIZE, WIN_LENGTH);
+
+        // --- LÓGICA DEL JUEGO ---
+
+        function startGame() {
+            currentPlayer = PLAYER_X;
+            boardState = Array(TOTAL_CELLS).fill(null);
+            gameActive = true;
+            boardElement.innerHTML = '';
+            boardElement.className = `grid grid-cols-${BOARD_SIZE} gap-1 mb-6`;
+            
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('board-cell', 'flex', 'items-center', 'justify-center');
+                cell.dataset.index = i;
+                cell.addEventListener('click', handleColumnClick);
+                cell.addEventListener('mouseover', handleMouseOver);
+                cell.addEventListener('mouseout', handleMouseOut);
+                boardElement.appendChild(cell);
+            }
+            updateStatus('¡Tu turno!');
+        }
+
+        function findLowestAvailableCell(column) {
+            for (let row = BOARD_SIZE - 1; row >= 0; row--) {
+                const index = row * BOARD_SIZE + column;
+                if (boardState[index] === null) {
+                    return index;
+                }
+            }
+            return null; // La columna está llena
+        }
+
+        function handleColumnClick(event) {
+            if (!gameActive || currentPlayer !== PLAYER_X) return;
+            const column = parseInt(event.target.dataset.index) % BOARD_SIZE;
+            const targetIndex = findLowestAvailableCell(column);
+
+            if (targetIndex !== null) {
+                makeMove(targetIndex, PLAYER_X);
+                if (!checkGameOver()) {
+                    updateStatus('Pensando...');
+                    setTimeout(computerMove, 500);
+                }
+            }
+        }
+        
+        function computerMove() {
+            if (!gameActive) return;
+
+            // 1. Buscar jugada para ganar
+            let strategicMoves = findStrategicMoves(PLAYER_O);
+            for (const move of strategicMoves) {
+                if (isMoveValid(move)) {
+                    makeMove(move, PLAYER_O);
+                    checkGameOver();
+                    return;
+                }
+            }
+
+            // 2. Buscar jugada para bloquear
+            strategicMoves = findStrategicMoves(PLAYER_X);
+            for (const move of strategicMoves) {
+                if (isMoveValid(move)) {
+                    makeMove(move, PLAYER_O);
+                    checkGameOver();
+                    return;
+                }
+            }
+
+            // 3. Estrategia de respaldo: jugar en una columna preferente
+            const preferredColumns = [3, 2, 4, 1, 5, 0];
+            for (const col of preferredColumns) {
+                const targetIndex = findLowestAvailableCell(col);
+                if (targetIndex !== null) {
+                    makeMove(targetIndex, PLAYER_O);
+                    checkGameOver();
+                    return;
+                }
+            }
+        }
+
+        function findStrategicMoves(player) {
+            const moves = [];
+            for (const combination of winningCombinations) {
+                const line = combination.map(index => boardState[index]);
+                const playerCount = line.filter(p => p === player).length;
+                const nullCount = line.filter(p => p === null).length;
+
+                if (playerCount === WIN_LENGTH - 1 && nullCount === 1) {
+                    const emptyIndex = combination.find(index => boardState[index] === null);
+                    moves.push(emptyIndex);
+                }
+            }
+            return moves;
+        }
+
+        function isMoveValid(index) {
+            const row = Math.floor(index / BOARD_SIZE);
+            // Es válida si es la fila de abajo O si la celda de abajo está ocupada
+            return row === BOARD_SIZE - 1 || boardState[index + BOARD_SIZE] !== null;
+        }
+
+        function makeMove(index, player) {
+            if (boardState[index] !== null || !gameActive) return;
+            boardState[index] = player;
+            const cell = boardElement.children[index];
+            cell.textContent = player;
+            cell.classList.add(player === PLAYER_X ? 'player-x' : 'player-o');
+            currentPlayer = (player === PLAYER_X) ? PLAYER_O : PLAYER_X;
+            handleMouseOut(); // Limpiar la vista previa tras el movimiento
+        }
+
+        function checkGameOver() {
+            let winner = null;
+            for (const combination of winningCombinations) {
+                const [a] = combination;
+                if (boardState[a] && combination.every(index => boardState[index] === boardState[a])) {
+                    winner = boardState[a];
+                    break;
+                }
+            }
+            if (winner) {
+                updateStatus(`¡Ha ganado ${winner}!`);
+                gameActive = false;
+                handleMouseOut(); // Limpiar el hover al final
+                return true;
+            }
+            if (!boardState.includes(null)) {
+                updateStatus('¡Es un empate!');
+                gameActive = false;
+                return true;
+            }
+            if (gameActive) {
+                updateStatus(currentPlayer === PLAYER_X ? '¡Tu turno!' : 'Turno del ordenador');
+            }
+            return false;
+        }
+
+        // --- FUNCIONES DE INTERFAZ ---
+
+        function handleMouseOver(event) {
+            if (!gameActive || currentPlayer !== PLAYER_X) return;
+            const column = parseInt(event.target.dataset.index) % BOARD_SIZE;
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                if (i % BOARD_SIZE === column) {
+                    boardElement.children[i].classList.add('column-hover');
+                }
+            }
+            const targetIndex = findLowestAvailableCell(column);
+            if (targetIndex !== null) {
+                boardElement.children[targetIndex].classList.add('drop-preview');
+            }
+        }
+
+        function handleMouseOut() {
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                boardElement.children[i].classList.remove('column-hover', 'drop-preview');
+            }
+        }
+        
+        function updateStatus(message) {
+            statusElement.textContent = message;
+            statusElement.classList.remove('status-message');
+            void statusElement.offsetWidth;
+            statusElement.classList.add('status-message');
+        }
+
+        // --- INICIALIZACIÓN ---
+        resetButton.addEventListener('click', startGame);
+        startGame();
+    </script>
+</body>
+</html>
+    <div id="game-container" class="bg-white dark:bg-gray-800 p-4 md:p-6 rounded-2xl shadow-2xl">
+        <div id="board" class="mb-6">
+            </div>
+
+        <div class="text-center">
+            <p id="status" class="text-xl font-semibold mb-4 h-8 status-message">¡Tu turno!</p>
+            <button id="reset-button" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-indigo-300">
+                Reiniciar Partida
+            </button>
+        </div>
+    </div>
+
+    <footer class="mt-8 text-center text-gray-500 dark:text-gray-400 text-sm">
+        <p>Proyecto educativo adaptado a 4 en Raya.</p>
+    </footer>
+
+    <script>
+        // --- CONFIGURACIÓN Y CONSTANTES DEL JUEGO ---
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
+        const resetButton = document.getElementById('reset-button');
+
+        const PLAYER_X = 'X'; // Jugador humano
+        const PLAYER_O = 'O'; // Ordenador
+        
+        const BOARD_SIZE = 6; // Tablero de 6x6
+        const WIN_LENGTH = 4; // Se necesitan 4 en raya para ganar
+        const TOTAL_CELLS = BOARD_SIZE * BOARD_SIZE;
+
+        let currentPlayer;
+        let boardState;
+        let gameActive;
+
+        /**
+         * Genera dinámicamente todas las combinaciones ganadoras para un tablero de cualquier tamaño.
+         * @param {number} size - El tamaño del lado del tablero (ej. 6 para un 6x6).
+         * @param {number} length - La longitud necesaria para ganar (ej. 4 para 4 en raya).
+         * @returns {Array<Array<number>>} - Un array de todas las combinaciones ganadoras.
+         */
+        function generateWinningCombinations(size, length) {
+            const combinations = [];
+            // Horizontales
+            for (let row = 0; row < size; row++) {
+                for (let col = 0; col <= size - length; col++) {
+                    const combo = [];
+                    for (let i = 0; i < length; i++) {
+                        combo.push(row * size + col + i);
+                    }
+                    combinations.push(combo);
+                }
+            }
+            // Verticales
+            for (let col = 0; col < size; col++) {
+                for (let row = 0; row <= size - length; row++) {
+                    const combo = [];
+                    for (let i = 0; i < length; i++) {
+                        combo.push((row + i) * size + col);
+                    }
+                    combinations.push(combo);
+                }
+            }
+            // Diagonales (de izq a der)
+            for (let row = 0; row <= size - length; row++) {
+                for (let col = 0; col <= size - length; col++) {
+                    const combo = [];
+                    for (let i = 0; i < length; i++) {
+                        combo.push((row + i) * size + (col + i));
+                    }
+                    combinations.push(combo);
+                }
+            }
+            // Diagonales (de der a izq)
+            for (let row = 0; row <= size - length; row++) {
+                for (let col = length - 1; col < size; col++) {
+                    const combo = [];
+                    for (let i = 0; i < length; i++) {
+                        combo.push((row + i) * size + (col - i));
+                    }
+                    combinations.push(combo);
+                }
+            }
+            return combinations;
+        }
+
+        const winningCombinations = generateWinningCombinations(BOARD_SIZE, WIN_LENGTH);
+
+        // --- FUNCIONES PRINCIPALES DEL JUEGO ---
+
+        function startGame() {
+            currentPlayer = PLAYER_X;
+            boardState = Array(TOTAL_CELLS).fill(null);
+            gameActive = true;
+
+            boardElement.innerHTML = '';
+            boardElement.className = `grid grid-cols-${BOARD_SIZE} gap-1 mb-6`;
+            
+            for (let i = 0; i < TOTAL_CELLS; i++) {
+                const cell = document.createElement('button');
+                cell.classList.add('board-cell', 'flex', 'items-center', 'justify-center', 'rounded-md');
+                cell.dataset.index = i;
+                cell.addEventListener('click', handleCellClick);
+                boardElement.appendChild(cell);
+            }
+            updateStatus(`¡Tu turno!`);
+        }
+
+        function handleCellClick(event) {
+            if (!gameActive) return;
+            const clickedCell = event.target;
+            const cellIndex = parseInt(clickedCell.dataset.index);
+            if (boardState[cellIndex] !== null || currentPlayer !== PLAYER_X) {
+                return;
+            }
+            makeMove(cellIndex, PLAYER_X);
+            if (!checkGameOver()) {
+                updateStatus('Pensando...');
+                setTimeout(computerMove, 500);
+            }
+        }
+
+        function computerMove() {
+            if (!gameActive) return;
+
+            // Prioridad 1: Intentar ganar (buscar 3 'O' en una línea de 4)
+            let move = findStrategicMove(PLAYER_O);
+            if (move !== null) {
+                makeMove(move, PLAYER_O);
+                checkGameOver();
+                return;
+            }
+
+            // Prioridad 2: Bloquear al jugador (buscar 3 'X' en una línea de 4)
+            move = findStrategicMove(PLAYER_X);
+            if (move !== null) {
+                makeMove(move, PLAYER_O);
+                checkGameOver();
+                return;
+            }
+
+            // Prioridad 3: Jugar al azar en una casilla disponible
+            const availableCells = boardState.map((cell, index) => cell === null ? index : null).filter(val => val !== null);
+            if (availableCells.length > 0) {
+                const randomIndex = Math.floor(Math.random() * availableCells.length);
+                makeMove(availableCells[randomIndex], PLAYER_O);
+                checkGameOver();
+            }
+        }
+
+        function findStrategicMove(player) {
+            for (const combination of winningCombinations) {
+                const line = combination.map(index => boardState[index]);
+                const playerCount = line.filter(p => p === player).length;
+                const nullCount = line.filter(p => p === null).length;
+
+                if (playerCount === WIN_LENGTH - 1 && nullCount === 1) {
+                    const emptyIndex = combination.find(index => boardState[index] === null);
+                    return emptyIndex;
+                }
+            }
+            return null;
+        }
+
+        function makeMove(index, player) {
+            if (boardState[index] !== null || !gameActive) return;
+            boardState[index] = player;
+            const cell = boardElement.children[index];
+            cell.textContent = player;
+            cell.classList.add(player === PLAYER_X ? 'player-x' : 'player-o');
+            cell.disabled = true;
+            currentPlayer = (player === PLAYER_X) ? PLAYER_O : PLAYER_X;
+        }
+
+        function checkGameOver() {
+            let winner = null;
+            for (const combination of winningCombinations) {
+                const [a] = combination;
+                if (boardState[a] && combination.every(index => boardState[index] === boardState[a])) {
+                    winner = boardState[a];
+                    break;
+                }
+            }
+
+            if (winner) {
+                updateStatus(`¡Ha ganado ${winner}!`);
+                gameActive = false;
+                return true;
+            }
+
+            if (!boardState.includes(null)) {
+                updateStatus('¡Es un empate!');
+                gameActive = false;
+                return true;
+            }
+
+            if (gameActive) {
+                updateStatus(currentPlayer === PLAYER_X ? '¡Tu turno!' : 'Turno del ordenador');
+            }
+            return false;
+        }
+
+        function updateStatus(message) {
+            statusElement.textContent = message;
+            statusElement.classList.remove('status-message');
+            void statusElement.offsetWidth;
+            statusElement.classList.add('status-message');
+        }
+
+        // --- INICIALIZACIÓN ---
+        resetButton.addEventListener('click', startGame);
+        startGame();
+    </script>
+</body>
+</html>
