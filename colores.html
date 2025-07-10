@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Clave Secreta</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f9;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        p {
+            color: #666;
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        table {
+            border-collapse: collapse;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        td {
+            width: 80px;
+            height: 80px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            background-color: #ffffff;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: rgba(0,0,0,0.4);
+            user-select: none;
+        }
+        td:active {
+            transform: scale(0.95);
+        }
+        #controls {
+            margin-top: 25px;
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+        #resetButton {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            background-color: #f44336;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: background-color 0.3s;
+            margin-bottom: 15px;
+        }
+        #resetButton:hover {
+            background-color: #d32f2f;
+        }
+        #statusMessage {
+            height: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        #hexCodeDisplay {
+            width: 100%;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 28px;
+            padding: 12px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            background-color: #fff;
+            text-align: center;
+            box-sizing: border-box;
+            color: #555;
+            transition: background-color 0.3s, border-color 0.3s;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Juego de Clave Secreta</h1>
+    <p>Introduce la clave de 6 dígitos. <br>Si te equivocas, vuelve a pulsar la casilla para anular.</p>
+    
+    <table id="colorGrid">
+        <tbody>
+            <tr><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td></tr>
+            <tr><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+    </table>
+
+    <div id="controls">
+        <button id="resetButton">Resetear</button>
+        <div id="statusMessage"></div>
+        <input type="text" id="hexCodeDisplay" placeholder="_ _ _ _ _ _" readonly>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- CONSTANTES Y VARIABLES ---
+            const SECRET_KEY = '2357BD'; // Primos: 2, 3, 5, 7, 11(B), 13(D)
+            const SUCCESS_CODE = 'VICTORIA-2025';
+            const originalColor = '#ffffff';
+            const baseColors = [
+                '#ff7eb9', '#ff65a3', '#7afcff', '#feff9c', '#fff740', '#f07470', '#ea2c62', '#4deeea',
+                '#74ee15', '#ffe700', '#f000ff', '#001eff', '#fce181', '#f8b9d4', '#a1de93', '#f7f48b'
+            ];
+            const hexChars = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'];
+            
+            let userInput = [];
+            let availableColors = [];
+            let gameLocked = false;
+
+            const cells = document.querySelectorAll('#colorGrid td');
+            const resetButton = document.getElementById('resetButton');
+            const hexDisplay = document.getElementById('hexCodeDisplay');
+            const statusMessage = document.getElementById('statusMessage');
+
+            // --- FUNCIONES ---
+
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+            
+            function setupGrid() {
+                gameLocked = false;
+                userInput = [];
+                availableColors = [...baseColors];
+                shuffle(availableColors);
+
+                cells.forEach((cell, index) => {
+                    cell.dataset.hexValue = hexChars[index];
+                    cell.textContent = hexChars[index];
+                    cell.style.backgroundColor = originalColor;
+                    cell.removeAttribute('data-colored');
+                });
+
+                hexDisplay.value = '';
+                hexDisplay.placeholder = '_ _ _ _ _ _';
+                hexDisplay.style.backgroundColor = '#fff';
+                hexDisplay.style.borderColor = '#ccc';
+                statusMessage.textContent = '';
+            }
+
+            function checkKey() {
+                const finalInput = userInput.join('');
+                if (finalInput === SECRET_KEY) {
+                    // --- ACIERTO ---
+                    statusMessage.textContent = '¡Clave Correcta!';
+                    statusMessage.style.color = '#2e7d32';
+                    hexDisplay.value = SUCCESS_CODE;
+                    hexDisplay.style.backgroundColor = '#c8e6c9';
+                    hexDisplay.style.borderColor = '#2e7d32';
+                    gameLocked = true;
+                } else {
+                    // --- FALLO ---
+                    statusMessage.textContent = 'Incorrecto. Intenta de nuevo.';
+                    statusMessage.style.color = '#d32f2f';
+                    hexDisplay.style.backgroundColor = '#ffcdd2';
+                    hexDisplay.style.borderColor = '#d32f2f';
+                    gameLocked = true;
+
+                    setTimeout(() => {
+                        userInput = [];
+                        hexDisplay.value = '';
+                        cells.forEach(cell => {
+                            cell.style.backgroundColor = originalColor;
+                            cell.removeAttribute('data-colored');
+                        });
+                        statusMessage.textContent = '';
+                        hexDisplay.style.backgroundColor = '#fff';
+                        hexDisplay.style.borderColor = '#ccc';
+                        gameLocked = false;
+                    }, 1500);
+                }
+            }
+
+            function handleCellClick() {
+                if (gameLocked) return;
+
+                const hexValue = this.dataset.hexValue;
+                const isColored = this.hasAttribute('data-colored');
+
+                if (isColored) {
+                    // --- ANULACIÓN ---
+                    const indexToRemove = userInput.lastIndexOf(hexValue);
+                    if (indexToRemove > -1) {
+                        userInput.splice(indexToRemove, 1);
+                    }
+                    this.removeAttribute('data-colored');
+                    this.style.backgroundColor = originalColor;
+                } else {
+                    // --- AÑADIR DÍGITO ---
+                    if (userInput.length >= 6) return;
+                    
+                    userInput.push(hexValue);
+                    this.setAttribute('data-colored', 'true');
+                    if (availableColors.length > 0) {
+                        this.style.backgroundColor = availableColors.pop();
+                    }
+                }
+
+                // Actualizar el display y comprobar si se ha completado la clave
+                hexDisplay.value = userInput.join('');
+                if (userInput.length === 6) {
+                    checkKey();
+                }
+            }
+            
+            // --- INICIALIZACIÓN ---
+            cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+            resetButton.addEventListener('click', setupGrid);
+            setupGrid();
+        });
+    </script>
+
+</body>
+</html>
