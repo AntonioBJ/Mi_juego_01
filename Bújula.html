@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Brújula de Navegación Web</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 15px;
+            background-color: #1a1a1a;
+            color: #fff;
+            text-align: center;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .setup {
+            background-color: #2c2c2c;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .input-row {
+            display: flex; gap: 10px; align-items: center; margin-bottom: 15px;
+        }
+        .input-row label { width: 80px; text-align: left; font-weight: bold; }
+        .input-row input { flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #555; background-color: #333; color: #fff; }
+        
+        button {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        #navigation {
+            display: none; /* Oculto por defecto */
+        }
+
+        #compass-container {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            margin: 30px auto;
+        }
+        #compass-rose {
+            width: 100%;
+            height: 100%;
+            transition: transform 0.2s linear;
+        }
+        #arrow {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-bottom: 120px solid rgba(255, 0, 0, 0.8);
+            top: 5px;
+            left: 50%;
+            transform-origin: 50% 90%;
+            transition: transform 0.2s linear;
+        }
+        #status {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        #error {
+            color: #ff4d4d;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Brújula de Navegación</h2>
+
+    <div id="setup" class="setup">
+        <h4>1. Define el Punto de Destino</h4>
+        <div class="input-row">
+            <label for="lat_deg">Latitud Ini:</label>
+            <input type="number" id="lat_deg" value="41">
+            <input type="number" id="lat_min" step="any" value="38.700">
+        </div>
+        <div class="input-row">
+            <label for="lon_deg">Longitud Ini:</label>
+            <input type="number" id="lon_deg" value="4">
+            <input type="number" id="lon_min" step="any" value="43.770">
+        </div>
+         <div class="input-row">
+            <label for="bearing">Rumbo:</label>
+            <input type="number" id="bearing" step="any" placeholder="Grados (0-360)" value="90">
+        </div>
+        <div class="input-row">
+            <label for="distance">Distancia:</label>
+            <input type="number" id="distance" step="any" placeholder="Metros" value="1000">
+        </div>
+        <button id="start-btn">Iniciar Navegación</button>
+    </div>
+
+    <div id="navigation">
+        <div id="compass-container">
+            <img id="compass-rose" src="https://i.imgur.com/c4zRbe9.png" alt="Brújula">
+            <div id="arrow"></div>
+        </div>
+        <p id="status">Obteniendo ubicación...</p>
+    </div>
+    
+    <p id="error"></p>
+
+</div>
+
+<script>
+let targetLat, targetLon;
+let compassRose = document.getElementById('compass-rose');
+let arrow = document.getElementById('arrow');
+let statusP = document.getElementById('status');
+let errorP = document.getElementById('error');
+
+document.getElementById('start-btn').addEventListener('click', startNavigation);
+
+function startNavigation() {
+    // --- 1. COMPROBAR SOPORTE DE APIs ---
+    if (!('geolocation' in navigator)) {
+        errorP.textContent = "Error: La geolocalización no es compatible con tu navegador.";
+        return;
+    }
+    if (!window.DeviceOrientationEvent) {
+        errorP.textContent = "Error: La orientación del dispositivo no es compatible.";
+        return;
+    }
+
+    // --- 2. CALCULAR DESTINO ---
+    try {
+        const lat_deg = parseFloat(document.getElementById('lat_deg').value);
+        const lat_min = parseFloat(document.getElementById('lat_min').value);
+        const lon_deg = parseFloat(document.getElementById('lon_deg').value);
+        const lon_min = parseFloat(document.getElementById('lon_min').value);
+        const bearing = parseFloat(document.getElementById('bearing').value);
+        const distance = parseFloat(document.getElementById('distance').value);
+
+        if ([lat_deg, lat_min, lon_deg, lon_min, bearing, distance].some(isNaN)) {
+            errorP.textContent = "Por favor, rellena todos los campos correctamente.";
+            return;
+        }
+
+        const startLat = lat_deg + lat_min / 60; // Asumimos N y W por simplicidad
+        const startLon = -(lon_deg + lon_min / 60);
+        
+        const R = 6371e3; // Radio de la Tierra en metros
+        const angularDistance = distance / R;
+        const bearingRad = toRad(bearing);
+        const startLatRad = toRad(startLat);
+        const startLonRad = toRad(startLon);
+
+        const targetLatRad = Math.asin(Math.sin(startLatRad) * Math.cos(angularDistance) +
+                              Math.cos(startLatRad) * Math.sin(angularDistance) * Math.cos(bearingRad));
+        
+        let targetLonRad = startLonRad + Math.atan2(Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(startLatRad),
+                                       Math.cos(angularDistance) - Math.sin(startLatRad) * Math.sin(targetLatRad));
+        
+        targetLat = toDeg(targetLatRad);
+        targetLon = toDeg(targetLonRad);
+
+        document.getElementById('setup').style.display = 'none';
+        document.getElementById('navigation').style.display = 'block';
+        errorP.textContent = '';
+
+    } catch(e) {
+        errorP.textContent = "Error al calcular el destino. Revisa los datos.";
+        return;
+    }
+
+    // --- 3. INICIAR SENSORES ---
+    // Permiso para orientación (iOS 13+)
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission()
+            .then(permissionState => {
+                if (permissionState === 'granted') {
+                    window.addEventListener('deviceorientation', handleOrientation);
+                } else {
+                    errorP.textContent = "Permiso de orientación denegado.";
+                }
+            })
+            .catch(console.error);
+    } else {
+        window.addEventListener('deviceorientation', handleOrientation);
+    }
+
+    // Iniciar seguimiento de ubicación
+    navigator.geolocation.watchPosition(handlePosition, handleError, {
+        enableHighAccuracy: true
+    });
+}
+
+function handleOrientation(event) {
+    if (!event.alpha) return;
+    // El 'alpha' es la dirección en la que apunta el dispositivo (0-360)
+    const heading = event.webkitCompassHeading || event.alpha;
+    compassRose.style.transform = `rotate(${-heading}deg)`;
+}
+
+function handlePosition(position) {
+    const currentLat = position.coords.latitude;
+    const currentLon = position.coords.longitude;
+
+    const bearingToTarget = calculateBearing(currentLat, currentLon, targetLat, targetLon);
+    const distanceToTarget = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+
+    arrow.style.transform = `rotate(${bearingToTarget}deg)`;
+    statusP.textContent = `Distancia: ${distanceToTarget.toFixed(0)} metros`;
+}
+
+function handleError(error) {
+    errorP.textContent = `Error de ubicación: ${error.message}`;
+}
+
+// --- FUNCIONES MATEMÁTICAS AUXILIARES ---
+function toRad(deg) { return deg * Math.PI / 180; }
+function toDeg(rad) { return rad * 180 / Math.PI; }
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Metros
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // en metros
+}
+
+function calculateBearing(lat1, lon1, lat2, lon2) {
+    const radLat1 = toRad(lat1);
+    const radLat2 = toRad(lat2);
+    const dLon = toRad(lon2 - lon1);
+    
+    const y = Math.sin(dLon) * Math.cos(radLat2);
+    const x = Math.cos(radLat1) * Math.sin(radLat2) -
+              Math.sin(radLat1) * Math.cos(radLat2) * Math.cos(dLon);
+              
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+</script>
+
+</body>
+</html>
+ 
