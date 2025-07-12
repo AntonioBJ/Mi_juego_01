@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Distancia y Rumbo con Mapa</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            background-color: #fff;
+            padding: 25px 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px H15px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 20px auto;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .coord-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .coord-group legend {
+            font-weight: bold;
+            color: #007bff;
+            padding: 0 5px;
+        }
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .input-row label {
+            font-weight: bold;
+            width: 70px;
+        }
+        .input-row input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .input-row select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        #resultado {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        #map {
+            height: 400px;
+            margin-top: 20px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Calculadora de Coordenadas con Mapa</h2>
+
+    <fieldset class="coord-group">
+        <legend>Punto 1</legend>
+        <div class="input-row">
+            <label for="lat1_deg">Latitud:</label>
+            <input type="number" id="lat1_deg" placeholder="Grados" value="41">
+            <input type="number" id="lat1_min" step="any" placeholder="Minutos" value="39.384">
+            <select id="lat1_dir">
+                <option value="N" selected>N</option>
+                <option value="S">S</option>
+            </select>
+        </div>
+        <div class="input-row">
+            <label for="lon1_deg">Longitud:</label>
+            <input type="number" id="lon1_deg" placeholder="Grados" value="4">
+            <input type="number" id="lon1_min" step="any" placeholder="Minutos" value="43.434">
+            <select id="lon1_dir">
+                <option value="E">E</option>
+                <option value="W" selected>W</option>
+            </select>
+        </div>
+    </fieldset>
+
+    <fieldset class="coord-group">
+        <legend>Punto 2</legend>
+         <div class="input-row">
+            <label for="lat2_deg">Latitud:</label>
+            <input type="number" id="lat2_deg" placeholder="Grados">
+            <input type="number" id="lat2_min" step="any" placeholder="Minutos">
+            <select id="lat2_dir">
+                <option value="N" selected>N</option>
+                <option value="S">S</option>
+            </select>
+        </div>
+        <div class="input-row">
+            <label for="lon2_deg">Longitud:</label>
+            <input type="number" id="lon2_deg" placeholder="Grados">
+            <input type="number" id="lon2_min" step="any" placeholder="Minutos">
+            <select id="lon2_dir">
+                <option value="E">E</option>
+                <option value="W" selected>W</option>
+            </select>
+        </div>
+    </fieldset>
+
+    <button onclick="calcularTodo()">Calcular y Mostrar Mapa</button>
+
+    <div id="resultado"></div>
+    <div id="map"></div>
+</div>
+
+<script>
+    let map; // Variable global para la instancia del mapa
+
+    // Convierte Grados y Minutos a Grados Decimales
+    function parseDDM(deg, min, dir) {
+        let dd = deg + (min / 60);
+        if (dir === 'S' || dir === 'W') {
+            dd *= -1;
+        }
+        return dd;
+    }
+
+    // Convierte Grados a Radianes
+    function toRad(grados) {
+        return grados * Math.PI / 180;
+    }
+
+    function calcularTodo() {
+        // --- Obtener y convertir Punto 1 ---
+        const lat1_deg = parseFloat(document.getElementById('lat1_deg').value);
+        const lat1_min = parseFloat(document.getElementById('lat1_min').value);
+        const lat1_dir = document.getElementById('lat1_dir').value;
+        const lon1_deg = parseFloat(document.getElementById('lon1_deg').value);
+        const lon1_min = parseFloat(document.getElementById('lon1_min').value);
+        const lon1_dir = document.getElementById('lon1_dir').value;
+        
+        // --- Obtener y convertir Punto 2 ---
+        const lat2_deg = parseFloat(document.getElementById('lat2_deg').value);
+        const lat2_min = parseFloat(document.getElementById('lat2_min').value);
+        const lat2_dir = document.getElementById('lat2_dir').value;
+        const lon2_deg = parseFloat(document.getElementById('lon2_deg').value);
+        const lon2_min = parseFloat(document.getElementById('lon2_min').value);
+        const lon2_dir = document.getElementById('lon2_dir').value;
+
+        // --- Validar inputs ---
+        if (isNaN(lat1_deg) || isNaN(lat1_min) || isNaN(lon1_deg) || isNaN(lon1_min) ||
+            isNaN(lat2_deg) || isNaN(lat2_min) || isNaN(lon2_deg) || isNaN(lon2_min)) {
+            document.getElementById('resultado').innerText = "Por favor, completa todos los campos.";
+            return;
+        }
+
+        const lat1 = parseDDM(lat1_deg, lat1_min, lat1_dir);
+        const lon1 = parseDDM(lon1_deg, lon1_min, lon1_dir);
+        const lat2 = parseDDM(lat2_deg, lat2_min, lat2_dir);
+        const lon2 = parseDDM(lon2_deg, lon2_min, lon2_dir);
+
+        // --- Cálculos ---
+        const R = 6371; // Radio de la Tierra en km
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const radLat1 = toRad(lat1);
+        const radLat2 = toRad(lat2);
+
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(radLat1) * Math.cos(radLat2) * Math.sin(dLon / 2) ** 2;
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distancia = R * c;
+
+        const y = Math.sin(dLon) * Math.cos(radLat2);
+        const x = Math.cos(radLat1) * Math.sin(radLat2) - Math.sin(radLat1) * Math.cos(radLat2) * Math.cos(dLon);
+        const rumboDeg = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+
+        // --- Mostrar Resultados ---
+        document.getElementById('resultado').innerHTML = `Distancia: ${distancia.toFixed(3)} km  |  Rumbo: ${rumboDeg.toFixed(2)}°`;
+        
+        // --- Mostrar Mapa ---
+        mostrarMapa(lat1, lon1, lat2, lon2);
+    }
+
+    function mostrarMapa(lat1, lon1, lat2, lon2) {
+        // Si el mapa ya existe, lo eliminamos para crear uno nuevo
+        if (map) {
+            map.remove();
+        }
+        
+        // Crear la instancia del mapa
+        map = L.map('map');
+        
+        // Añadir la capa de teselas (el mapa base de OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Crear los puntos para los marcadores y la línea
+        const punto1 = [lat1, lon1];
+        const punto2 = [lat2, lon2];
+        
+        // Añadir marcadores
+        L.marker(punto1).addTo(map).bindPopup('<b>Punto 1</b>').openPopup();
+        L.marker(punto2).addTo(map).bindPopup('<b>Punto 2</b>');
+
+        // Añadir línea recta entre los puntos
+        L.polyline([punto1, punto2], {color: 'blue', weight: 3}).addTo(map);
+
+        // Ajustar el zoom del mapa para que se vean ambos puntos
+        map.fitBounds([punto1, punto2], { padding: [50, 50] });
+    }
+</script>
+
+</body>
+</html>
+ 
