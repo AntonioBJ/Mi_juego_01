@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>El Misterio de Zorrilla (Pistas Clave)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=IM+Fell+English&display=swap');
+        body {
+            font-family: 'IM Fell English', serif;
+            background-color: #fdfaf4;
+            color: #4a3c31;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #game-container {
+            background-color: #f7f1e3;
+            padding: 25px 40px;
+            border: 2px solid #c8bda9;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            max-width: 750px;
+            width: 100%;
+        }
+        h1, h2 {
+            font-family: 'Cinzel', serif;
+            text-align: center;
+            color: #5a4a3a;
+            border-bottom: 1px solid #c8bda9;
+            padding-bottom: 10px;
+            letter-spacing: 1px;
+        }
+        p {
+            line-height: 1.7;
+            text-align: justify;
+        }
+        #clues-container {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #fdfaf4;
+            border-left: 3px solid #8c7a6b;
+            min-height: 50px;
+        }
+        .clue { margin: 0 0 10px 0; font-style: italic; }
+        .clue-prompt { text-align: center; margin-top: 20px; }
+        #clue-input {
+            padding: 8px;
+            font-family: 'IM Fell English', serif;
+            border: 1px solid #c8bda9;
+            margin-right: 10px;
+            width: 150px;
+        }
+        .controls button, #clue-submit {
+            background-color: #8c7a6b;
+            color: white;
+            border: 1px solid #5a4a3a;
+            padding: 10px 20px;
+            font-family: 'Cinzel', serif;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            letter-spacing: 1px;
+        }
+        .controls button:hover, #clue-submit:hover { background-color: #5a4a3a; }
+        .controls button:disabled, #clue-submit:disabled {
+            background-color: #a0a0a0;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        #deduction-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+        .form-group { display: flex; flex-direction: column; }
+        label { margin-bottom: 8px; font-weight: bold; color: #555; }
+        select {
+            padding: 10px;
+            border: 1px solid #c8bda9;
+            font-family: 'IM Fell English', serif;
+            font-size: 16px;
+            background-color: #fff;
+        }
+        #result { margin-top: 20px; padding: 15px; text-align: center; font-size: 1.1em; font-weight: bold; display: none; }
+        .success { background-color: #e2efd9; color: #4b643a; border: 1px solid #a3b995; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .controls { text-align: center; margin: 25px 0;}
+        #accusation-status {
+            text-align: center;
+            color: #9d1a1a;
+            font-style: italic;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <h1>El Misterio del Manuscrito Perdido</h1>
+        <p>
+            "¡Por todos los diablos!", exclama Don José Zorrilla, alisándose el bigote. "En mis propias narices... un tesoro de nuestras letras, el mismísimo 'El Espectro de Toledo' de Lope, hurtado de su vitrina. La velada era un hervidero de artistas y mecenas, y entre versos y vino, un ladrón ha danzado. La cerradura no fue forzada. Debemos actuar con la astucia de un personaje de capa y espada para resolver este entuerto. Analicemos a los presentes, el método y el posible escondite en este mismo estudio".
+        </p>
+        <hr>
+
+        <h2>Pistas de Don José</h2>
+        <div id="clues-container">
+            <p>Se necesita la clave correcta para desvelar cada confidencia del poeta.</p>
+        </div>
+        <div class="clue-prompt">
+            <label for="clue-input"><b>Clave para la siguiente pista:</b></label>
+            <input type="text" id="clue-input" placeholder="Escriba la clave...">
+            <button id="clue-submit" onclick="submitCluePassword()">Desvelar</button>
+        </div>
+
+        <hr>
+        
+        <fieldset id="deduction-fieldset">
+            <h2 style="margin-top:0;">Veredicto Final</h2>
+            <p id="accusation-status">El botón de acusación se activará al obtener las 4 pistas clave.</p>
+            <form id="deduction-form">
+                 <div class="form-group">
+                    <label for="suspect">👤 Sospechoso:</label>
+                    <select id="suspect">
+                        <option value="">¿Quién es el culpable?</option>
+                        <option value="El Marqués">El Marqués de Portillo, un rico mecenas</option>
+                        <option value="Doña Elvira">Doña Elvira, la poetisa rival</option>
+                        <option value="Don Anselmo">Don Anselmo, el viejo archivista</option>
+                        <option value="Leandro">Leandro, el joven estudiante de letras</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="method">🔧 Método:</label>
+                    <select id="method">
+                        <option value="">¿Cómo lo hizo?</option>
+                        <option value="Llave falsa">Con una copia falsa de la llave</option>
+                        <option value="Carta falsificada">Usando una carta falsificada</option>
+                        <option value="Somnífero en el vino">Con un somnífero en el vino del guardia</option>
+                        <option value="Distracción y engaño">Aprovechando una distracción</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="location">📍 Escondite:</label>
+                    <select id="location">
+                        <option value="">¿Dónde está el manuscrito?</option>
+                        <option value="Dentro del reloj de pie">Dentro del reloj de pie</option>
+                        <option value="Doble fondo en un tomo">En el doble fondo de un gran libro</option>
+                        <option value="Bajo una tabla suelta">Bajo una tabla suelta del parqué</option>
+                        <option value="Hueco del cortinaje">En el hueco del cortinaje</option>
+                    </select>
+                </div>
+            </form>
+
+            <div class="controls">
+                <button id="accusation-button" onclick="makeAccusation()" disabled>¡Presentar Acusación!</button>
+            </div>
+        </fieldset>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // --- DATOS DEL JUEGO ---
+        const solution = {
+            suspect: "Leandro",
+            method: "Distracción y engaño",
+            location: "Bajo una tabla suelta"
+        };
+        
+        const passwords = ["león", "granada", "2022", "1506", "gracias", "enhorabuena"];
+        
+        // --- PISTAS NECESARIAS PARA ACUSAR ---
+        const requiredPasswordsForAccusation = ["león", "granada", "2022", "1506"];
+
+        const clues = [
+            "El Marqués de Portillo no se separó de mí; discutíamos sobre la métrica del soneto. Es un hombre de honor, incapaz de tal vileza.",
+            "La cerradura es compleja, pero no fue forzada. Quien la abrió, usó la llave original. Don Anselmo jura que solo la perdió de vista un instante.",
+            "Doña Elvira, en un acto de dramatismo, derramó una copa de vino. El revuelo que se armó fue el centro de todas las miradas durante un buen rato.",
+            "El viejo relojero visitó la sala esta tarde. Puedo asegurar que el mecanismo del reloj de pie no ha sido alterado.",
+            "Un amante de las letras, como sé que es el ladrón, jamás arriesgaría la integridad del manuscrito en un lugar polvoriento y expuesto como el hueco de un cortinaje.",
+            "Me he percatado de que Don Anselmo cojea levemente. Se queja de que una tabla del suelo 'baila' cerca de la estantería oeste, un escondrijo perfecto y discreto."
+        ];
+        
+        let usedPasswords = [];
+
+        // --- LÓGICA DEL JUEGO ---
+        function submitCluePassword() {
+            const input = document.getElementById('clue-input');
+            const password = input.value.toLowerCase().trim();
+            const cluesContainer = document.getElementById('clues-container');
+            const clueSubmitButton = document.getElementById('clue-submit');
+
+            if (usedPasswords.includes(password)) {
+                alert("Esa clave ya ha sido utilizada. ¡Intenta con otra!");
+                return;
+            }
+
+            const passwordIndex = passwords.indexOf(password);
+
+            if (passwordIndex !== -1) {
+                if (usedPasswords.length === 0) {
+                    cluesContainer.innerHTML = ''; 
+                }
+                const newClue = document.createElement('p');
+                newClue.className = 'clue';
+                newClue.textContent = `Confidencia encontrada: ${clues[passwordIndex]}`;
+                cluesContainer.appendChild(newClue);
+                
+                usedPasswords.push(password);
+                input.value = '';
+
+                // --- LÓGICA DE DESBLOQUEO MODIFICADA ---
+                // Comprueba si TODAS las pistas requeridas están en la lista de usadas.
+                const canAccuse = requiredPasswordsForAccusation.every(pwd => usedPasswords.includes(pwd));
+
+                if (canAccuse) {
+                    const accusationButton = document.getElementById('accusation-button');
+                    if (accusationButton.disabled) {
+                        accusationButton.disabled = false;
+                        const statusMessage = document.getElementById('accusation-status');
+                        statusMessage.textContent = "¡Has reunido las pistas clave! Ya puedes presentar tu acusación.";
+                        statusMessage.style.color = "#155724";
+                    }
+                }
+
+                if (usedPasswords.length === passwords.length) {
+                    clueSubmitButton.textContent = 'No hay más pistas';
+                    clueSubmitButton.disabled = true;
+                    input.disabled = true;
+                }
+            } else {
+                alert("Clave incorrecta. No consigo recordar ese detalle así...");
+            }
+        }
+
+        function makeAccusation() {
+            const userSuspect = document.getElementById('suspect').value;
+            const userMethod = document.getElementById('method').value;
+            const userLocation = document.getElementById('location').value;
+            const resultDiv = document.getElementById('result');
+
+            if (!userSuspect || !userMethod || !userLocation) {
+                alert('¡Don José, debemos estar seguros! Elija un sospechoso, un método y un escondite.');
+                return;
+            }
+            
+            if (userSuspect === solution.suspect && userMethod === solution.method && userLocation === solution.location) {
+                resultDiv.innerHTML = `<h2>¡Misterio Resuelto!</h2><p>"¡Eureka!", grita Zorrilla. "El joven <strong>${solution.suspect}</strong>, en su ciega admiración, creó una <strong>${solution.method}</strong> para hacerse con la llave y ocultar el manuscrito <strong>${solution.location}</strong>. Un acto más de pasión que de malicia. ¡La justicia poética ha prevalecido y como premio, las coordenadas finales son N 42º 34.234 W 3º 30.222 !"</p>`;
+                resultDiv.className = 'success';
+            } else {
+                resultDiv.innerHTML = `<h2>¡Acusación Errónea!</h2><p>"Me temo que erramos el tiro", murmura Zorrilla. "El culpable se nos escapa entre las sombras de la duda. Debemos repensar las pistas. ¡El honor de las letras está en juego!"</p>`;
+                resultDiv.className = 'error';
+            }
+            
+            resultDiv.style.display = 'block';
+        }
+    </script>
+
+</body>
+</html>
