@@ -249,7 +249,7 @@
             }
             
             if (userSuspect === solution.suspect && userMethod === solution.method && userLocation === solution.location) {
-                resultDiv.innerHTML = `<h2>¡Misterio Resuelto!</h2><p>"¡Eureka!", grita Zorrilla. "El joven <strong>${solution.suspect}</strong>, en su ciega admiración, creó una <strong>${solution.method}</strong> para hacerse con la llave y ocultar el manuscrito <strong>${solution.location}</strong>. Un acto más de pasión que de malicia. ¡La justicia poética ha prevalecido y como premio, las coordenadas finales son N 42º 34.234 W 3º 30.222 !"</p>`;
+                resultDiv.innerHTML = `<h2>¡Misterio Resuelto!</h2><p>"¡Eureka!", grita Zorrilla. "El joven <strong>${solution.suspect}</strong>, en su ciega admiración, creó una <strong>${solution.method}</strong> para hacerse con la llave y ocultar el manuscrito <strong>${solution.location}</strong>. Un acto más de pasión que de malicia. ¡La justicia poética ha prevalecido!. Como premio, la clave para el Certitude es: <h3> Don_Juan_Tenorio </h3>"</p>`;
                 resultDiv.className = 'success';
             } else {
                 resultDiv.innerHTML = `<h2>¡Acusación Errónea!</h2><p>"Me temo que erramos el tiro", murmura Zorrilla. "El culpable se nos escapa entre las sombras de la duda. Debemos repensar las pistas. ¡El honor de las letras está en juego!"</p>`;
